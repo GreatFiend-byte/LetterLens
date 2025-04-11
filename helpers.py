@@ -3,23 +3,13 @@ import cv2
 import os
 from collections import Counter
 from continuity import analyze_word_continuity
-try:
-    import fitz  # Primero intenta con la instalación normal
-except ImportError:
-    # Fallback para entornos donde fitz no está disponible directamente
-    import pymupdf as fitz
-    
+
 # Abecedario en inglés
 alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'pdf'}
 
-def extract_text(filepath, filename):
-    if filename.endswith('.pdf'):
-        return extract_text_from_pdf(filepath)  # Extraer texto del PDF
-    else:
-        return extract_text_from_image(filepath)  # Extraer texto de la imagen
 
 def extract_text_from_image(filepath):
     # Leer la imagen con OpenCV
@@ -35,17 +25,7 @@ def extract_text_from_image(filepath):
     text = pytesseract.image_to_string(image, lang='eng', config='--psm 6')
     return text.strip()
 
-def extract_text_from_pdf(filepath):
-    text = ""
-    # Abrir el PDF
-    pdf_document = fitz.open(filepath)
-    
-    for page_num in range(len(pdf_document)):
-        page = pdf_document[page_num]
-        text += page.get_text() + "\n"  # Extraer texto de cada página
-    
-    pdf_document.close()
-    return text.strip()
+
 
 def check_continuity(filepath):
     image = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
@@ -148,11 +128,6 @@ def main():
 if __name__ == "__main__":
     main()
 
-def analyze_continuity_per_word(filepath):
-    """
-    Procesa el archivo para analizar continuidad palabra por palabra.
-    """
-    return analyze_word_continuity(filepath)
 
 def analyze_word_continuity_from_text(text):
     """
