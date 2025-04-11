@@ -1,10 +1,14 @@
 import pytesseract
 import cv2
-import fitz
 import os
 from collections import Counter
 from continuity import analyze_word_continuity
-
+try:
+    import fitz  # Primero intenta con la instalación normal
+except ImportError:
+    # Fallback para entornos donde fitz no está disponible directamente
+    import pymupdf as fitz
+    
 # Abecedario en inglés
 alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
