@@ -29,12 +29,7 @@ except ImportError:
     print("Advertencia: Flask-Session no está instalado. Usando sesiones estándar de Flask.")
 
 # Configura Tesseract para Railway o local
-if 'RAILWAY_ENVIRONMENT' in os.environ:
-    # Entorno Railway: Tesseract está instalado globalmente
-    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-else:
-    # Entorno local (Windows)
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 # Configuración del entorno
 app = Flask(__name__)
@@ -109,19 +104,7 @@ def process_image():
         _, thresh_image = cv2.threshold(gray_image, 150, 255, cv2.THRESH_BINARY_INV)
         
         #custom_config = r'--oem 3 --psm 6'
-        custom_config = r'''
-        --oem 3  # Usar el motor OCR LSTM
-        --psm 6  # Asumir un bloque uniforme de texto
-        -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÑñ0123456789  # Caracteres permitidos
-        -c preserve_interword_spaces=1  # Conservar espacios
-        -c textord_min_linesize=2.0  # Tamaño mínimo de línea
-        -c textord_old_xheight=0  # Forzar recalculo de altura
-        -c tessedit_adapt_to_char_fragments=1  # Adaptarse a fragmentos
-        -c tessedit_adaption_debug=0  # Desactivar debug
-        -c textord_noise_normratio=0.1  # Ratio de ruido
-        -c textord_heavy_nr=1  # Eliminar ruido pesado
-        -c edges_max_children_per_outline=40  # Máximo de contornos hijos
-        '''
+        custom_config = r'--oem 3 --psm 6 -l spa'
         recognized_text = pytesseract.image_to_string(thresh_image, lang='spa', config=custom_config)
     
         # Extraer cada letra y su posición
