@@ -13,7 +13,7 @@ from collections import Counter
 import re
 from datetime import datetime
 from PIL import Image
-from helpers import extract_text_from_image, extract_text_from_pdf, check_continuity, analyze_continuity_per_word, analyze_word_continuity_from_text
+from helpers import check_continuity, analyze_word_continuity_from_text
 from glob import glob
 from time import time
 import matplotlib
