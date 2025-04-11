@@ -1,7 +1,6 @@
-# Usa una imagen base con Python y Tesseract preinstalado
 FROM python:3.9-slim
 
-# Instala Tesseract y sus dependencias
+# Instala dependencias del sistema
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-spa \
@@ -11,17 +10,16 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Configura el entorno de trabajo
 WORKDIR /app
 
-# Copia los archivos necesarios
+# Configuración del entorno para matplotlib
+ENV MPLBACKEND=Agg
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
+
+# Instala dependencias con versiones específicas
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Configura la variable de entorno para Tesseract
-ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
-
-# Ejecuta la aplicación
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "LetterLens:app"]
