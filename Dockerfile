@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y \
     tesseract-ocr-spa \
     libtesseract-dev \
     libleptonica-dev \
+    libgl1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Configura el entorno de trabajo
