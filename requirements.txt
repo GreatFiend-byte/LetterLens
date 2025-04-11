@@ -15,4 +15,4 @@ Flask-Session>=0.4.0
 gunicorn==21.2.0
 reportlab
 fitz
-pymupdf==1.18.14
+pymupdf==1.23.7
