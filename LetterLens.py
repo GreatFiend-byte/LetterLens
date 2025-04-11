@@ -28,8 +28,12 @@ except ImportError:
     USE_FLASK_SESSION = False
     print("Advertencia: Flask-Session no está instalado. Usando sesiones estándar de Flask.")
 
-# Configura Tesseract para Railway o local
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+os.environ['TESSDATA_PREFIX'] = '/usr/share/tesseract-ocr/tessdata'
+
+# Verificación
+print("TESSDATA_PREFIX:", os.environ.get('TESSDATA_PREFIX'))
+print("Idiomas disponibles:", pytesseract.get_languages(config=''))
 
 # Configuración del entorno
 app = Flask(__name__)
