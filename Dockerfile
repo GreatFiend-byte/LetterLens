@@ -23,5 +23,8 @@ COPY . .
 # Configura la variable de entorno para Tesseract
 ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
 
+RUN pip install --upgrade pip wheel && \
+    pip install PyMuPDF==1.23.7 --no-cache-dir
+
 # Ejecuta la aplicación
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "LetterLens:app"]
