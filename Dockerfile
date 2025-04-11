@@ -3,7 +3,7 @@ FROM python:3.9-slim
 # Instala Tesseract y los paquetes de idioma español
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
-    tesseract-ocr-spa \  # Paquete específico para español
+    tesseract-ocr-spa \
     libtesseract-dev \
     libleptonica-dev \
     libgl1 \
