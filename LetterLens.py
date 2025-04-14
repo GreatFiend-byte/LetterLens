@@ -417,7 +417,7 @@ def download_pdf():
     elements.append(Paragraph("Reporte Completo de Análisis de Escritura", title_style))
     elements.append(Paragraph(f"Generado el: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
     elements.append(Spacer(1, 0.2*inch))
-
+    
     
     if image_path:
         elements.append(Paragraph("Imagen Analizada", section_style))
@@ -445,66 +445,12 @@ def download_pdf():
         )
         elements.append(Paragraph(recognized_text, text_style))
         elements.append(Spacer(1, 0.2*inch))
-    '''
-    if letters:
-        elements.append(Paragraph("Caracteres Segmentados", section_style))
-        data = []
-        row = []
-        
-        for i, letter in enumerate(letters):
-            img = safe_image(letter['path'], width=0.5*inch, height=0.5*inch)
-            char_info = f"Letra: {letter['char']}"
-            
-            if img:
-                cell_content = [img, Paragraph(char_info, styles['Normal'])]
-            else:
-                cell_content = [Paragraph(f"{char_info} (sin imagen)", styles['Normal'])]
-            
-            row.append(cell_content)
-            
-            if (i+1) % 4 == 0 or i == len(letters)-1:
-                data.append(row)
-                row = []
-        
-        table = Table(data, colWidths=[1.5*inch]*4)
-        table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
-        ]))
-        elements.append(table)
-        elements.append(Spacer(1, 0.2*inch))
-    '''
+    
     if max_length > 0:
-        elements.append(Paragraph("Clasificador de Letras", section_style))
+        elements.append(PageBreak())
+        elements.append(Paragraph("Identificador y Clasificador de Letras", section_style))
         data = [["Pequeñas", "Medianas", "Grandes"]]
-        '''
-        for i in range(max_length):
-            row = []
-            for category in ["pequenia", "mediana", "grande"]:
-                if i < len(classified_letters[category]):
-                    if category == "pequenia":
-                        img = safe_image(classified_letters[category][i], width=0.12*inch, height=0.13*inch)
-                    elif category == "mediana":
-                        img = safe_image(classified_letters[category][i], width=0.25*inch, height=0.25*inch)
-                    else:
-                        img = safe_image(classified_letters[category][i], width=0.5*inch, height=0.5*inch)
-                    row.append(img if img else "")
-                else:
-                    row.append("")
-            data.append(row)
-        
-        table = Table(data, colWidths=[2*inch]*3)
-        table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F8F9FA')),
-        ]))
-        elements.append(table)
-        elements.append(Spacer(1, 0.2*inch))
-        '''
-        # 1. Gráfica de pastel (clasificación de letras)
+    
         try:
             grafica_pastel = generar_grafica_pastel()
             if grafica_pastel:
@@ -514,24 +460,23 @@ def download_pdf():
                     elements.append(Spacer(1, 0.2*inch))
         except Exception as e:
             print(f"Error al generar gráfica de pastel: {str(e)}", file=sys.stderr)
-
-    '''
-    if letters_with_angles:
-        elements.append(Paragraph("Letras Reconocidas y Ángulos", section_style))
-        data = [["Letra", "Ángulo (°)"]]
-        for letter in letters_with_angles:
-            data.append([letter.get('char', ''), str(letter.get('angle', 'N/A'))])
+            
+    elements.append(Paragraph("Continuidad del Trazo", section_style))
+    if continuity_results:
+        elements.append(Paragraph(
+            f"Porcentaje general de arriba hacia abajo: {continuity_results.get('above_below', 'N/A')}%", 
+            styles['Normal']))
         
-        table = Table(data, colWidths=[1.5*inch, 1.5*inch])
-        table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F8F9FA')),
-        ]))
-        elements.append(table)
-        elements.append(Spacer(1, 0.2*inch))
-    '''
+        is_continuous = continuity_results.get('is_continuous', False)
+        elements.append(Paragraph(
+            f"¿El trazo general es continuo?: {'Sí' if is_continuous else 'No'}", 
+            styles['Normal']))
+    else:
+        elements.append(Paragraph("No hay datos de continuidad general", styles['Italic']))
+    elements.append(Spacer(1, 0.2*inch))
+    
     if letter_counts:
+        elements.append(PageBreak())
         elements.append(Paragraph("Letras Comparadas", section_style))
         filtered_counts = {k: v for k, v in letter_counts.items() if v > 0}
         sorted_letters = sorted(filtered_counts.items(), key=lambda x: x[0])
@@ -562,21 +507,8 @@ def download_pdf():
         except Exception as e:
             print(f"Error al generar gráfica de letras: {str(e)}", file=sys.stderr)
 
-    elements.append(Paragraph("Continuidad del Trazo", section_style))
-    if continuity_results:
-        elements.append(Paragraph(
-            f"Porcentaje general de arriba hacia abajo: {continuity_results.get('above_below', 'N/A')}%", 
-            styles['Normal']))
-        
-        is_continuous = continuity_results.get('is_continuous', False)
-        elements.append(Paragraph(
-            f"¿El trazo general es continuo?: {'Sí' if is_continuous else 'No'}", 
-            styles['Normal']))
-    else:
-        elements.append(Paragraph("No hay datos de continuidad general", styles['Italic']))
-    elements.append(Spacer(1, 0.2*inch))
     
-    
+    elements.append(PageBreak())
     elements.append(Paragraph("Continuidad por Palabra", section_style))
     try:
         grafica_pastel = generar_grafica_pastel3()
@@ -587,23 +519,7 @@ def download_pdf():
                 elements.append(Spacer(1, 0.2*inch))
     except Exception as e:
         print(f"Error al generar gráfica de pastel: {str(e)}", file=sys.stderr)
-    '''
-    if word_continuity_results:
-        data = [["Palabra", "Continuidad"]]
-        for result in word_continuity_results[:15]:
-            data.append([result.get('word', ''), 'Sí' if result.get('is_continuous', False) else 'No'])
-        
-        table = Table(data, colWidths=[3.5*inch, 1.5*inch])
-        table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-            ('ALIGN', (1,1), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F8F9FA')),
-        ]))
-        elements.append(table)
-    else:
-        elements.append(Paragraph("No hay datos de continuidad por palabra", styles['Italic']))
-    '''
+
     elements.append(Spacer(1, 0.5*inch))
     elements.append(Paragraph("Reporte generado por Digitalizador de Letras", styles['Italic']))
     
@@ -616,6 +532,8 @@ def download_pdf():
         download_name=f"analisis_escritura_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
         mimetype="application/pdf"
     )
+    
+    
 
 def generar_grafica_pastel():
     # Obtener los datos de la sesión
@@ -642,7 +560,7 @@ def generar_grafica_pastel():
     plt.figure(figsize=(7, 6))
     plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
     plt.axis('equal')  # Para que el pastel sea circular
-    plt.title(f'Distribución de Letras\nTotal: {total} letras')
+    plt.title(f'Clasificación de Letras\nTotal: {total} letras')
     
     # Convertir la gráfica a imagen para mostrar en HTML
     buffer = BytesIO()
