@@ -116,10 +116,10 @@ def process_image():
 
         # 1. Configuración del lector con parámetros optimizados
         reader = easyocr.Reader(
-            ['en', 'es'],
+            ['es'],
             gpu=False,  # Más estable en CPU para algunas configuraciones
             model_storage_directory='modelos_easyocr',  # Evita descargas repetidas
-            download_enabled=True
+            download_enabled=True,
         )
 
         # 2. Parámetros mejorados para readtext()
@@ -128,11 +128,12 @@ def process_image():
             allowlist=allowlist,
             detail=0,  # Solo devuelve el texto (sin coordenadas/confianza)
             paragraph=True,  # Agrupa líneas en párrafos
-            batch_size=10,  # Procesamiento más eficiente
+            batch_size=4,  # Procesamiento más eficiente
             contrast_ths=0.3,  # Umbral de contraste ajustado
             adjust_contrast=0.7,  # Ajuste automático de contraste
             text_threshold=0.8,  # Filtra texto de baja confianza
             low_text=0.4,  # Detección de texto con bajo contraste
+            decoder='greedy',  # Más rápido que beamsearch
             link_threshold=0.4  # Agrupación de caracteres
         )
 
