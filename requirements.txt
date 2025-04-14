@@ -15,4 +15,6 @@ Flask-Session>=0.4.0
 gunicorn==21.2.0
 matplotlib==3.8.2
 reportlab==4.0.4
-python-dotenv
+google-cloud-vision>=3.0.0
+google-auth>=2.0.0
+python-dotenv>=1.0.0
