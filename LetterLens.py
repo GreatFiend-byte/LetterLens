@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 import cv2
 import base64
 import numpy as np
@@ -20,6 +21,24 @@ from time import time
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from google.cloud import vision
+from google.oauth2 import service_account
+import json
+
+load_dotenv() 
+
+creds_json_str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if creds_json_str is None:
+    raise ValueError("La variable GOOGLE_APPLICATION_CREDENTIALS_JSON no está configurada")
+
+# Convierte el string a un diccionario
+creds_dict = json.loads(creds_json_str)
+
+# Crea las credenciales
+credentials = service_account.Credentials.from_service_account_info(creds_dict)
+
+client = vision.ImageAnnotatorClient(credentials=credentials)
+
 
 # Configuración de Flask-Session con manejo de errores
 try:
@@ -89,6 +108,18 @@ def cleanup_temp_images():
     session.clear()
     flash('Las imágenes temporales se han eliminado.')
 
+def detect_text(image_path):
+    """Detecta texto en una imagen"""
+    
+    with open(image_path, 'rb') as image_file:
+        content = image_file.read()
+    
+    image = vision.Image(content=content)
+    response = client.text_detection(image=image)
+    
+    texts = response.text_annotations
+    return texts
+
 @app.route('/process_image', methods=['POST'])
 def process_image():
     if 'image' not in request.files:
@@ -110,13 +141,16 @@ def process_image():
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
         enhanced = clahe.apply(gray_image)
         thresh_image = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-
-
+        
+        result = detect_text(filepath)
+        recognized_text = result[0].description if result else ''
+         
+        '''
         recognized_text = pytesseract.image_to_string(
             thresh_image,
             lang='spa',
             config='--psm 6 --oem 1 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ')
-        
+        ''' 
         
         print("Texto reconocido mejorado:", recognized_text)
         
