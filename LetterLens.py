@@ -654,7 +654,7 @@ def generar_grafica_pastel():
     cantidades = {
         "Pequeña": len(classified_letters["pequenia"]),
         "Mediana": len(classified_letters["mediana"]),
-        "Grande": len( ["grande"])
+        "Grande": len(classified_letters["grande"])
     }
     
     total = sum(cantidades.values())
