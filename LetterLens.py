@@ -13,12 +13,14 @@ from collections import Counter
 import re
 from datetime import datetime
 from PIL import Image
+#from helpers import extract_text_from_image, extract_text_from_pdf, check_continuity, analyze_continuity_per_word, analyze_word_continuity_from_text
 from helpers import check_continuity, analyze_word_continuity_from_text
 from glob import glob
 from time import time
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import easyocr
 
 # Configuración de Flask-Session con manejo de errores
 try:
@@ -28,12 +30,13 @@ except ImportError:
     USE_FLASK_SESSION = False
     print("Advertencia: Flask-Session no está instalado. Usando sesiones estándar de Flask.")
 
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-os.environ['TESSDATA_PREFIX'] = '/usr/share/tesseract-ocr/tessdata'
-
-# Verificación
-print("TESSDATA_PREFIX:", os.environ.get('TESSDATA_PREFIX'))
-print("Idiomas disponibles:", pytesseract.get_languages(config=''))
+# Configura Tesseract para Railway o local
+if 'RAILWAY_ENVIRONMENT' in os.environ:
+    # Entorno Railway: Tesseract está instalado globalmente
+    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+else:
+    # Entorno local (Windows)
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Configuración del entorno
 app = Flask(__name__)
@@ -105,13 +108,43 @@ def process_image():
         
         image = cv2.imread(filepath)
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        _, thresh_image = cv2.threshold(gray_image, 150, 255, cv2.THRESH_BINARY_INV)
+        thresh_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
         
-        #custom_config = r'--oem 3 --psm 6'
-        custom_config = r'--oem 3 --psm 6 -l spa'
-        recognized_text = pytesseract.image_to_string(thresh_image, lang='spa', config=custom_config)
-    
-        # Extraer cada letra y su posición
+       
+        # Configuración mejorada para OCR
+        allowlist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 '
+
+        # 1. Configuración del lector con parámetros optimizados
+        reader = easyocr.Reader(
+            ['en', 'es'],
+            gpu=False,  # Más estable en CPU para algunas configuraciones
+            model_storage_directory='modelos_easyocr',  # Evita descargas repetidas
+            download_enabled=True
+        )
+
+        # 2. Parámetros mejorados para readtext()
+        resultados = reader.readtext(
+            thresh_image,
+            allowlist=allowlist,
+            detail=0,  # Solo devuelve el texto (sin coordenadas/confianza)
+            paragraph=True,  # Agrupa líneas en párrafos
+            batch_size=10,  # Procesamiento más eficiente
+            contrast_ths=0.3,  # Umbral de contraste ajustado
+            adjust_contrast=0.7,  # Ajuste automático de contraste
+            text_threshold=0.8,  # Filtra texto de baja confianza
+            low_text=0.4,  # Detección de texto con bajo contraste
+            link_threshold=0.4  # Agrupación de caracteres
+        )
+
+        # 3. Post-procesamiento mejorado
+        recognized_text = " ".join(resultados)
+
+        # 4. Filtrado adicional con regex
+        import re
+        clean_text = re.sub(r'[^\w\s]|_', '', recognized_text)  # Elimina símbolos no deseados
+        clean_text = re.sub(r'\s+', ' ', clean_text).strip()  # Normaliza espacios
+
+        print("Texto reconocido mejorado:", clean_text)
         boxes = pytesseract.image_to_boxes(thresh_image, lang='spa')
         letters = []
 
@@ -123,6 +156,7 @@ def process_image():
         for box in boxes.splitlines():
             b = box.split()
             char = b[0]
+            
             x, y, w, h = int(b[1]), int(b[2]), int(b[3]), int(b[4])
             cropped_letter = image[image.shape[0] - h:image.shape[0] - y, x:w]
 
@@ -325,7 +359,7 @@ def download_pdf():
     import sys
     import base64
     from io import BytesIO
-
+        # Importaciones necesarias
     pdf_buffer = BytesIO()
     
     # Obtener datos optimizados de la sesión
@@ -343,10 +377,20 @@ def download_pdf():
     }
     max_length = session.get('max_length', 0)
     
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter_size)
+    # Configuración del documento
+    doc = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=letter_size,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+
     styles = getSampleStyleSheet()
     elements = []
-    
+
+    # Estilos personalizados
     title_style = ParagraphStyle(
         'Title',
         parent=styles['Heading1'],
@@ -355,7 +399,7 @@ def download_pdf():
         spaceAfter=20,
         textColor=colors.HexColor('#2C3E50')
     )
-    
+
     section_style = ParagraphStyle(
         'Section',
         parent=styles['Heading2'],
@@ -363,6 +407,13 @@ def download_pdf():
         spaceBefore=20,
         spaceAfter=10,
         textColor=colors.HexColor('#3498DB')
+    )
+
+    text_style = ParagraphStyle(
+        'TextStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=12
     )
 
     def safe_image(path, width=None, height=None):
@@ -394,12 +445,14 @@ def download_pdf():
 
     
     if image_path:
-        elements.append(Paragraph("1. Imagen Analizada", section_style))
+        elements.append(Paragraph("Imagen Analizada", section_style))
         try:
             img_path = os.path.join(app.config['UPLOAD_FOLDER'], image_path)
             img = safe_image(img_path, width=5*inch, height=3*inch)
             if img:
                 elements.append(img)
+                elements.append(Spacer(1, 0.2*inch))
+                
             else:
                 elements.append(Paragraph("Imagen no disponible", styles['Italic']))
         except Exception as e:
@@ -408,7 +461,7 @@ def download_pdf():
         elements.append(Spacer(1, 0.2*inch))
 
     if recognized_text:
-        elements.append(Paragraph("2. Texto Reconocido", section_style))
+        elements.append(Paragraph("Texto Reconocido", section_style))
         text_style = ParagraphStyle(
             'TextStyle',
             parent=styles['Normal'],
@@ -417,9 +470,9 @@ def download_pdf():
         )
         elements.append(Paragraph(recognized_text, text_style))
         elements.append(Spacer(1, 0.2*inch))
-
+    '''
     if letters:
-        elements.append(Paragraph("3. Caracteres Segmentados", section_style))
+        elements.append(Paragraph("Caracteres Segmentados", section_style))
         data = []
         row = []
         
@@ -446,11 +499,11 @@ def download_pdf():
         ]))
         elements.append(table)
         elements.append(Spacer(1, 0.2*inch))
-
+    '''
     if max_length > 0:
-        elements.append(Paragraph("4. Clasificador de Letras", section_style))
+        elements.append(Paragraph("Clasificador de Letras", section_style))
         data = [["Pequeñas", "Medianas", "Grandes"]]
-        
+        '''
         for i in range(max_length):
             row = []
             for category in ["pequenia", "mediana", "grande"]:
@@ -475,6 +528,7 @@ def download_pdf():
         ]))
         elements.append(table)
         elements.append(Spacer(1, 0.2*inch))
+        '''
         # 1. Gráfica de pastel (clasificación de letras)
         try:
             grafica_pastel = generar_grafica_pastel()
@@ -486,9 +540,9 @@ def download_pdf():
         except Exception as e:
             print(f"Error al generar gráfica de pastel: {str(e)}", file=sys.stderr)
 
-
+    '''
     if letters_with_angles:
-        elements.append(Paragraph("5. Letras Reconocidas y Ángulos", section_style))
+        elements.append(Paragraph("Letras Reconocidas y Ángulos", section_style))
         data = [["Letra", "Ángulo (°)"]]
         for letter in letters_with_angles:
             data.append([letter.get('char', ''), str(letter.get('angle', 'N/A'))])
@@ -501,9 +555,9 @@ def download_pdf():
         ]))
         elements.append(table)
         elements.append(Spacer(1, 0.2*inch))
-
+    '''
     if letter_counts:
-        elements.append(Paragraph("6. Letras Comparadas", section_style))
+        elements.append(Paragraph("Letras Comparadas", section_style))
         filtered_counts = {k: v for k, v in letter_counts.items() if v > 0}
         sorted_letters = sorted(filtered_counts.items(), key=lambda x: x[0])
         
@@ -533,7 +587,7 @@ def download_pdf():
         except Exception as e:
             print(f"Error al generar gráfica de letras: {str(e)}", file=sys.stderr)
 
-    elements.append(Paragraph("7. Continuidad del Trazo", section_style))
+    elements.append(Paragraph("Continuidad del Trazo", section_style))
     if continuity_results:
         elements.append(Paragraph(
             f"Porcentaje general de arriba hacia abajo: {continuity_results.get('above_below', 'N/A')}%", 
@@ -546,8 +600,19 @@ def download_pdf():
     else:
         elements.append(Paragraph("No hay datos de continuidad general", styles['Italic']))
     elements.append(Spacer(1, 0.2*inch))
-
-    elements.append(Paragraph("8. Continuidad por Palabra", section_style))
+    
+    
+    elements.append(Paragraph("Continuidad por Palabra", section_style))
+    try:
+        grafica_pastel = generar_grafica_pastel3()
+        if grafica_pastel:
+            img_pastel = base64_to_image(grafica_pastel, width=6*inch, height=5*inch)
+            if img_pastel:
+                elements.append(img_pastel)
+                elements.append(Spacer(1, 0.2*inch))
+    except Exception as e:
+        print(f"Error al generar gráfica de pastel: {str(e)}", file=sys.stderr)
+    '''
     if word_continuity_results:
         data = [["Palabra", "Continuidad"]]
         for result in word_continuity_results[:15]:
@@ -563,10 +628,10 @@ def download_pdf():
         elements.append(table)
     else:
         elements.append(Paragraph("No hay datos de continuidad por palabra", styles['Italic']))
-    
+    '''
     elements.append(Spacer(1, 0.5*inch))
     elements.append(Paragraph("Reporte generado por Digitalizador de Letras", styles['Italic']))
-
+    
     doc.build(elements)
     pdf_buffer.seek(0)
     
@@ -589,7 +654,7 @@ def generar_grafica_pastel():
     cantidades = {
         "Pequeña": len(classified_letters["pequenia"]),
         "Mediana": len(classified_letters["mediana"]),
-        "Grande": len(classified_letters["grande"])
+        "Grande": len( ["grande"])
     }
     
     total = sum(cantidades.values())
@@ -603,6 +668,62 @@ def generar_grafica_pastel():
     plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
     plt.axis('equal')  # Para que el pastel sea circular
     plt.title(f'Distribución de Letras\nTotal: {total} letras')
+    
+    # Convertir la gráfica a imagen para mostrar en HTML
+    buffer = BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    image_png = buffer.getvalue()
+    buffer.close()
+    
+    # Codificar la imagen en base64
+    grafica_url = base64.b64encode(image_png).decode('utf-8')
+    grafica_url = f'data:image/png;base64,{grafica_url}'
+    
+    # Cerrar la figura para liberar memoria
+    plt.close()
+    
+    return grafica_url
+
+
+def generar_grafica_pastel3():
+    # Obtener los datos de la sesión
+    word_continuity_results = session.get('word_continuity_results', [])
+    
+    total_palabras = 0
+    palabras_continuas = 0
+    palabras_no_continuas = 0
+
+    # Procesar cada palabra
+    for resultado in word_continuity_results:
+        total_palabras += 1
+        if resultado['is_continuous']:
+            palabras_continuas += 1
+        else:
+            palabras_no_continuas += 1
+
+    # Calcular porcentajes
+    porcentaje_continuas = (palabras_continuas / total_palabras) * 100 if total_palabras > 0 else 0
+    porcentaje_no_continuas = (palabras_no_continuas / total_palabras) * 100 if total_palabras > 0 else 0
+
+    
+    # Calcular las cantidades
+    cantidades = {
+        "Palabras Continuas": porcentaje_continuas,
+        "Palabras No Continuas": porcentaje_no_continuas,
+    }
+    
+    total = total_palabras
+    
+    # Preparar datos para la gráfica
+    labels = [f"{k}" for k, v in cantidades.items()]
+    sizes = cantidades.values()
+    
+    # Crear la gráfica
+    plt.figure(figsize=(7, 6))
+    plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
+    plt.axis('equal')  
+    plt.title(f'Continuidad de Palabras\nTotal: {total} palabras')
     
     # Convertir la gráfica a imagen para mostrar en HTML
     buffer = BytesIO()
@@ -688,7 +809,7 @@ def generar_grafica_letras():
     )
     
     # Título
-    plt.title(f'Distribución de Letras (≥1 ocurrencia)\nTotal: {total_letters} letras | Margen error: {margen_error}',
+    plt.title(f'Distribución de Letras Total: {total_letters} letras | Margen error: {margen_error}',
              fontsize=11, pad=20)
     
     # Ajustar layout
