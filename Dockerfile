@@ -31,4 +31,4 @@ COPY . .
 RUN echo "Idiomas instalados:" && tesseract --list-langs && \
     echo "Archivos en TESSDATA_PREFIX:" && ls -la $TESSDATA_PREFIX
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--timeout", "120", "--workers", "4", "--threads", "2", "LetterLens:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--timeout", "240", "--workers", "4", "--threads", "2", "LetterLens:app"]
