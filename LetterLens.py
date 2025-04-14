@@ -20,7 +20,6 @@ from time import time
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import easyocr
 
 # Configuración de Flask-Session con manejo de errores
 try:
@@ -108,44 +107,19 @@ def process_image():
         
         image = cv2.imread(filepath)
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        thresh_image = cv2.threshold(gray_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-        
-       
-        # Configuración mejorada para OCR
-        allowlist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 '
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(gray_image)
+        thresh_image = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
-        # 1. Configuración del lector con parámetros optimizados
-        reader = easyocr.Reader(
-            ['es'],
-            gpu=False,  # Más estable en CPU para algunas configuraciones
-            model_storage_directory='modelos_easyocr',  # Evita descargas repetidas
-            download_enabled=True,
-        )
 
-        # 2. Parámetros mejorados para readtext()
-        resultados = reader.readtext(
+        recognized_text = pytesseract.image_to_string(
             thresh_image,
-            allowlist=allowlist,
-            detail=0,  # Solo devuelve el texto (sin coordenadas/confianza)
-            paragraph=True,  # Agrupa líneas en párrafos
-            batch_size=4,  # Procesamiento más eficiente
-            contrast_ths=0.3,  # Umbral de contraste ajustado
-            adjust_contrast=0.7,  # Ajuste automático de contraste
-            text_threshold=0.8,  # Filtra texto de baja confianza
-            low_text=0.4,  # Detección de texto con bajo contraste
-            decoder='greedy',  # Más rápido que beamsearch
-            link_threshold=0.4  # Agrupación de caracteres
-        )
-
-        # 3. Post-procesamiento mejorado
-        recognized_text = " ".join(resultados)
-
-        # 4. Filtrado adicional con regex
-        import re
-        clean_text = re.sub(r'[^\w\s]|_', '', recognized_text)  # Elimina símbolos no deseados
-        clean_text = re.sub(r'\s+', ' ', clean_text).strip()  # Normaliza espacios
-
-        print("Texto reconocido mejorado:", clean_text)
+            lang='spa',
+            config='--psm 6 --oem 1 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ')
+        
+        
+        print("Texto reconocido mejorado:", recognized_text)
+        
         boxes = pytesseract.image_to_boxes(thresh_image, lang='spa')
         letters = []
 
